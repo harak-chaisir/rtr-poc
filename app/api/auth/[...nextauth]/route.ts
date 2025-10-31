@@ -4,6 +4,7 @@ import { connectToDB } from "@/lib/db";
 import { authenticateFastTrak, refreshFastTrakToken } from "@/lib/fasttrak";
 import { RtrUser } from "@/lib/models/User";
 import { decrypt, encrypt } from '@/lib/crypto';
+import type { IRtrUser } from "@/lib/models/User";
 
 // Constants
 const SESSION_MAX_AGE = 60 * 60; // 60 minutes in seconds
@@ -30,7 +31,7 @@ export const authOptions: AuthOptions = {
                     const accessTokenExpiresAt = now + (fasttrak.accessTokenExpirationSeconds * 1000);
                     const refreshTokenExpiresAt = now + (fasttrak.refreshTokenExpiratinSeconds * 1000);
 
-                    const user = await RtrUser.findOneAndUpdate(
+                    const userDoc = await RtrUser.findOneAndUpdate(
                         {fasttrakId: fasttrak.id},
                         { 
                             $setOnInsert: { createdAt: new Date() }, 
@@ -40,11 +41,13 @@ export const authOptions: AuthOptions = {
                             } 
                         },
                         { upsert: true, new: true }
-                    ).lean() as any;
+                    ).lean();
 
-                    if (!user) {
+                    if (!userDoc) {
                         throw new Error('Failed to create or update user');
                     }
+
+                    const user = userDoc as unknown as IRtrUser & { _id: { toString: () => string } };
 
                     return {
                         id: user._id.toString(),
@@ -57,7 +60,7 @@ export const authOptions: AuthOptions = {
                         _accessTokenExpiresAt: accessTokenExpiresAt,
                         _refreshTokenExpiresAt: refreshTokenExpiresAt
                     };
-                } catch (error) {
+                } catch {
                     return null;
                 }
             }
@@ -100,7 +103,7 @@ export const authOptions: AuthOptions = {
                 token.refreshToken = encrypt(refreshed.refreshToken || refreshToken);
                 token.refreshTokenExpiresAt = now + (refreshed.refreshTokenExpirationSeconds * 1000);
                 return token;
-            } catch (err) {
+            } catch {
                 delete token.accessToken;
                 delete token.refreshToken;
                 delete token.accessTokenExpiresAt;

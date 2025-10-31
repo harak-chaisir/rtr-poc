@@ -37,8 +37,8 @@ export function AuthButton() {
   }
 
   return (
-    <Button asChild variant="default" size="sm">
-      <Link href="/login">Sign In</Link>
-    </Button>
+    <Link href="/login">
+      <Button variant="default" size="sm">Sign In</Button>
+    </Link>
   );
 }

@@ -5,14 +5,19 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { Badge } from '@/components/ui/Badge';
-import { User, Shield, Clock } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/Alert';
+import { User, Shield, Clock, AlertCircle } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Dashboard | RTR Authentication',
   description: 'User dashboard for authenticated users',
 };
 
-export default async function DashboardPage() {
+interface DashboardPageProps {
+  searchParams: { error?: string; message?: string };
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const session = await getServerSession(authOptions);
 
   // Redirect to login if not authenticated
@@ -22,6 +27,9 @@ export default async function DashboardPage() {
 
   const user = session.user;
   const customSession = session;
+  
+  // Get error and message from query params (from middleware redirects)
+  const { error, message } = await searchParams;
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,6 +45,15 @@ export default async function DashboardPage() {
 
       {/* Main Content */}
       <main className="container py-8">
+        {/* Error Alert */}
+        {error && message && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>{error === 'unauthorized' ? 'Access Denied' : 'Forbidden'}:</strong> {message}
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Welcome Card */}
           <Card className="md:col-span-2 lg:col-span-2">

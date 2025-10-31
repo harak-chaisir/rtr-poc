@@ -42,7 +42,6 @@ export async function authenticateFastTrak(username: string, password: string): 
         });
 
         if (!res.ok) {
-            const errorText = await res.text();
             throw new Error(`Failed to authenticate: ${res.status} ${res.statusText}`);
         }
 
@@ -55,7 +54,7 @@ export async function authenticateFastTrak(username: string, password: string): 
         try {
             const jsonResponse = JSON.parse(cleanedResponse);
             return jsonResponse;
-        } catch (parseError) {
+        } catch {
             throw new Error('FastTrak API returned invalid JSON response');
         }
     } catch (error) {
@@ -95,7 +94,6 @@ export async function refreshFastTrakToken(fasttrakId: string, refreshToken: str
         });
 
         if (!res.ok) {
-            const errorText = await res.text();
             throw new Error(`Failed to refresh token: ${res.status} ${res.statusText}`);
         }
 
@@ -104,7 +102,7 @@ export async function refreshFastTrakToken(fasttrakId: string, refreshToken: str
         try {
             const refreshResponse = JSON.parse(responseText);
             return refreshResponse;
-        } catch (parseError) {
+        } catch {
             throw new Error('FastTrak refresh API returned invalid JSON response');
         }
     } catch (error) {

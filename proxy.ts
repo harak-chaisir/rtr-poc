@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { withAuth } from 'next-auth/middleware';
 import type { JWT } from 'next-auth/jwt';
 import {
   isPublicRoute,
@@ -11,7 +11,6 @@ import {
   hasRequiredRoles,
   getRedirectConfig,
   normalizePath,
-  buildCallbackUrl,
   DEFAULT_LOGIN_REDIRECT,
 } from '@/lib/routes';
 
@@ -19,137 +18,138 @@ import {
 const DEBUG = process.env.NODE_ENV === 'development';
 
 /**
- * Next.js 16 Proxy for Advanced Routing and Authentication
+ * Next.js 16 Proxy with NextAuth middleware integration
  * 
- * Features:
- * - Protected route access control with role-based authorization
- * - Authenticated user redirects from auth pages
- * - Dynamic route redirects with callback URL preservation
+ * Uses NextAuth's withAuth wrapper for better authentication handling:
+ * - Automatic session validation
+ * - Built-in token refresh
+ * - Better error handling
+ * - Role-based authorization
  * - Security headers injection
  * - Request performance tracking
- * - Debug logging in development
  * 
- * @param request - The incoming Next.js request
- * @returns NextResponse with appropriate redirect or headers
+ * @see https://next-auth.js.org/configuration/nextjs#middleware
  */
-export default async function proxy(request: NextRequest) {
-  const startTime = DEBUG ? Date.now() : 0;
-  const { pathname, search } = request.nextUrl;
-  const normalizedPath = normalizePath(pathname);
+export default withAuth(
+  async function proxy(request: NextRequest) {
+    const startTime = DEBUG ? Date.now() : 0;
+    const { pathname } = request.nextUrl;
+    const normalizedPath = normalizePath(pathname);
 
-  // Debug logging
-  if (DEBUG) {
-    console.log(`[Proxy] ${request.method} ${pathname}`);
-  }
-  
-  // 1. Check for static redirects first (fastest check)
-  const redirectConfig = getRedirectConfig(normalizedPath);
-  if (redirectConfig) {
+    // Debug logging
     if (DEBUG) {
-      console.log(`[Proxy] Static redirect: ${normalizedPath} → ${redirectConfig.destination}`);
+      console.log(`[Proxy] ${request.method} ${pathname}`);
     }
-    const url = new URL(redirectConfig.destination!, request.url);
-    return NextResponse.redirect(url, {
-      status: redirectConfig.permanent ? 308 : 307,
-    });
-  }
-
-  // 2. Skip auth middleware for NextAuth API routes (early return for performance)
-  if (pathname.startsWith('/api/auth')) {
-    return NextResponse.next();
-  }
-
-  // 3. Get the session token (expensive operation - do only once)
-  let token: JWT | null = null;
-  let isAuthenticated = false;
-  let userRoles: string[] = [];
-
-  try {
-    token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-    isAuthenticated = !!token;
-    userRoles = (token?.roles as string[]) || [];
     
+    // 1. Check for static redirects first (fastest check)
+    const redirectConfig = getRedirectConfig(normalizedPath);
+    if (redirectConfig) {
+      if (DEBUG) {
+        console.log(`[Proxy] Static redirect: ${normalizedPath} → ${redirectConfig.destination}`);
+      }
+      const url = new URL(redirectConfig.destination!, request.url);
+      return NextResponse.redirect(url, {
+        status: redirectConfig.permanent ? 308 : 307,
+      });
+    }
+
+    // 2. Get token from request (provided by withAuth)
+    const token = (request as NextRequest & { nextauth?: { token?: JWT } }).nextauth?.token;
+    const isAuthenticated = !!token;
+    const userRoles = (token?.roles as string[]) || [];
+
     if (DEBUG && isAuthenticated) {
       console.log(`[Proxy] Authenticated user: ${token?.rtrUserId}, roles: ${userRoles.join(', ')}`);
     }
-  } catch (error) {
-    // Token parsing failed - treat as unauthenticated
-    if (DEBUG) {
-      console.error('[Proxy] Token parsing error:', error);
-    }
-  }
 
-  // 4. Handle public routes
-  if (isPublicRoute(normalizedPath)) {
-    // Redirect authenticated users away from auth pages (prevent accessing login when logged in)
-    if (isAuthRoute(normalizedPath) && isAuthenticated) {
-      const callbackUrl = request.nextUrl.searchParams.get('callbackUrl');
-      const destination = callbackUrl || DEFAULT_LOGIN_REDIRECT;
-      
-      if (DEBUG) {
-        console.log(`[Proxy] Redirecting authenticated user from ${normalizedPath} → ${destination}`);
+    // 3. Handle public routes
+    if (isPublicRoute(normalizedPath)) {
+      // Redirect authenticated users away from auth pages
+      if (isAuthRoute(normalizedPath) && isAuthenticated) {
+        const callbackUrl = request.nextUrl.searchParams.get('callbackUrl');
+        const destination = callbackUrl || DEFAULT_LOGIN_REDIRECT;
+        
+        if (DEBUG) {
+          console.log(`[Proxy] Redirecting authenticated user from ${normalizedPath} → ${destination}`);
+        }
+        
+        return NextResponse.redirect(new URL(destination, request.url));
       }
       
-      return NextResponse.redirect(new URL(destination, request.url));
+      // Allow access to public routes
+      return addSecurityHeaders(NextResponse.next(), false, startTime);
     }
-    
-    // Allow access to public routes
-    return addSecurityHeaders(NextResponse.next(), false, startTime);
-  }
 
-  // 5. Require authentication for protected routes
-  const isProtected = isProtectedRoute(normalizedPath) || isAdminRoute(normalizedPath);
-  
-  if (!isAuthenticated && isProtected) {
-    if (DEBUG) {
-      console.log(`[Proxy] Unauthenticated access to protected route: ${normalizedPath}`);
-    }
+    // 4. Check role-based access for protected routes
+    const isProtected = isProtectedRoute(normalizedPath) || isAdminRoute(normalizedPath);
     
-    const loginUrl = buildCallbackUrl(normalizedPath + search, request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // 6. Check role-based access for authenticated users
-  if (isAuthenticated && isProtected) {
-    // Check admin routes first (most restrictive)
-    if (isAdminRoute(normalizedPath) && !userRoles.includes('Admin')) {
-      if (DEBUG) {
-        console.log(`[Proxy] Admin access denied for user with roles: ${userRoles.join(', ')}`);
+    if (isAuthenticated && isProtected) {
+      // Check admin routes first (most restrictive)
+      if (isAdminRoute(normalizedPath) && !userRoles.includes('Admin')) {
+        if (DEBUG) {
+          console.log(`[Proxy] Admin access denied for user with roles: ${userRoles.join(', ')}`);
+        }
+        
+        const dashboardUrl = new URL('/dashboard', request.url);
+        dashboardUrl.searchParams.set('error', 'forbidden');
+        dashboardUrl.searchParams.set('message', 'Admin access required');
+        return NextResponse.redirect(dashboardUrl);
       }
-      
-      const dashboardUrl = new URL('/dashboard', request.url);
-      dashboardUrl.searchParams.set('error', 'forbidden');
-      dashboardUrl.searchParams.set('message', 'Admin access required');
-      return NextResponse.redirect(dashboardUrl);
-    }
 
-    // Check role-based routes
-    const requiredRoles = getRequiredRoles(normalizedPath);
-    
-    if (requiredRoles && requiredRoles.length > 0 && !hasRequiredRoles(userRoles, requiredRoles)) {
-      if (DEBUG) {
-        console.log(`[Proxy] Role check failed. Required: ${requiredRoles.join(', ')}, Has: ${userRoles.join(', ')}`);
+      // Check role-based routes
+      const requiredRoles = getRequiredRoles(normalizedPath);
+      
+      if (requiredRoles && requiredRoles.length > 0 && !hasRequiredRoles(userRoles, requiredRoles)) {
+        if (DEBUG) {
+          console.log(`[Proxy] Role check failed. Required: ${requiredRoles.join(', ')}, Has: ${userRoles.join(', ')}`);
+        }
+        
+        const dashboardUrl = new URL('/dashboard', request.url);
+        dashboardUrl.searchParams.set('error', 'unauthorized');
+        dashboardUrl.searchParams.set('message', `Access denied. Required roles: ${requiredRoles.join(' or ')}`);
+        return NextResponse.redirect(dashboardUrl);
       }
-      
-      const dashboardUrl = new URL('/dashboard', request.url);
-      dashboardUrl.searchParams.set('error', 'unauthorized');
-      dashboardUrl.searchParams.set('message', `Access denied. Required roles: ${requiredRoles.join(' or ')}`);
-      return NextResponse.redirect(dashboardUrl);
     }
-  }
 
-  // 7. Allow access and add security headers
-  return addSecurityHeaders(
-    NextResponse.next(),
-    isAuthenticated,
-    startTime,
-    token,
-    userRoles
-  );
-}
+    // 5. Allow access and add security headers
+    return addSecurityHeaders(
+      NextResponse.next(),
+      isAuthenticated,
+      startTime,
+      token,
+      userRoles
+    );
+  },
+  {
+    callbacks: {
+      /**
+       * Authorize callback - determines if user can access the route
+       * Return true to allow, false to redirect to login
+       */
+      authorized: ({ req, token }) => {
+        const { pathname } = req.nextUrl;
+        const normalizedPath = normalizePath(pathname);
+
+        // Always allow public routes
+        if (isPublicRoute(normalizedPath)) {
+          return true;
+        }
+
+        // Require authentication for protected routes
+        const isProtected = isProtectedRoute(normalizedPath) || isAdminRoute(normalizedPath);
+        if (isProtected) {
+          return !!token; // Must have valid token
+        }
+
+        // Allow other routes
+        return true;
+      },
+    },
+    pages: {
+      signIn: '/login',
+    },
+  }
+)
 
 /**
  * Add security headers to the response

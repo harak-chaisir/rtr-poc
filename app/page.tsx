@@ -1,18 +1,11 @@
 import Image from "next/image";
-import { AuthButton } from "@/components/auth/AuthButton";
+import { Navbar } from "@/components/Navbar";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold">RTR Authentication</h1>
-          </div>
-          <AuthButton />
-        </div>
-      </header>
+      {/* Navbar */}
+      <Navbar />
 
       {/* Main Content */}
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-zinc-50 font-sans dark:bg-black">

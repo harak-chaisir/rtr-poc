@@ -3,28 +3,43 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { 
   Home, 
   LayoutDashboard, 
   Settings, 
   Shield,
+  Users,
   Menu,
   X,
   Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navigation = [
+const baseNavigation = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
+];
+
+const adminNavigation = [
+  { name: 'Manage Users', href: '/admin/users', icon: Users, adminOnly: true },
+  { name: 'Admin', href: '/admin', icon: Shield, adminOnly: true },
 ];
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  // Check if user is admin
+  const isAdmin = session?.user?.roles?.includes('Admin') ?? false;
+
+  // Build navigation based on user role
+  const navigation = isAdmin 
+    ? [...baseNavigation, ...adminNavigation]
+    : baseNavigation;
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60">

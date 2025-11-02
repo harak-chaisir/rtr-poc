@@ -14,6 +14,12 @@ export type FastTrakRefreshResp = {
     refreshTokenExpirationSeconds: number;
 }
 
+export type FastTrakRegisterResp = {
+    id: string; // FastTrak user ID
+    username: string;
+    message: string;
+}
+
 const FT_BASE = process.env.FASTTRAK_API || 'http://localhost:3001';
 
 /**
@@ -109,6 +115,72 @@ export async function refreshFastTrakToken(fasttrakId: string, refreshToken: str
         // Check if this is a network error (FastTrak API not running)
         if (error instanceof TypeError && error.message.includes('fetch')) {
             throw new Error('Unable to connect to FastTrak API for token refresh. Please ensure the FastTrak service is running on ' + FT_BASE);
+        }
+        
+        throw error;
+    }
+}
+
+/**
+ * Registers a new user in the FastTrak system
+ * 
+ * @param username - Unique username for the new user
+ * @param password - User password (will be hashed by FastTrak)
+ * @param email - User email address
+ * @param name - User's full name
+ * @returns FastTrak registration response with user ID
+ * @throws Error if registration fails or FastTrak API is unreachable
+ * 
+ * @example
+ * ```typescript
+ * const response = await registerFastTrakUser('john.doe', 'SecureP@ss123', 'john@example.com', 'John Doe');
+ * console.log(response.id); // FastTrak user ID
+ * ```
+ */
+export async function registerFastTrakUser(
+    username: string,
+    password: string,
+    email: string,
+    name: string
+): Promise<FastTrakRegisterResp> {
+    try {
+        const res = await fetch(`${FT_BASE}/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password, email, name }),
+            next: { revalidate: 0 },
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Failed to register user: ${res.status} ${res.statusText}`;
+            
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.message) {
+                    errorMessage = errorJson.message;
+                }
+            } catch {
+                // Error response not JSON
+            }
+            
+            throw new Error(errorMessage);
+        }
+
+        const responseText = await res.text();
+        
+        try {
+            const registerResponse = JSON.parse(responseText);
+            return registerResponse;
+        } catch {
+            throw new Error('FastTrak register API returned invalid JSON response');
+        }
+    } catch (error) {
+        // Check if this is a network error (FastTrak API not running)
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            throw new Error('Unable to connect to FastTrak API for registration. Please ensure the FastTrak service is running on ' + FT_BASE);
         }
         
         throw error;

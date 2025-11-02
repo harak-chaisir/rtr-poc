@@ -3,8 +3,9 @@ import { getToken } from 'next-auth/jwt';
 import { withLoggingAndErrorHandling } from '@/lib/logger';
 import { UnauthorizedError, BadGatewayError } from '@/lib/errors';
 import { decryptAccessToken } from '@/lib/auth/token-service';
+import { config } from '@/lib/config';
 
-const FASTTRAK_BASE_URL = process.env.FASTTRAK_API || 'http://localhost:3001';
+const FASTTRAK_BASE_URL = config.fastTrakApi;
 
 /**
  * FastTrak API Proxy
@@ -21,11 +22,11 @@ async function handleProxyRequest(
   pathSegments: string[],
   method: string
 ) {
-  // Get user token for authentication
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
+    // Get user token for authentication
+    const token = await getToken({
+      req: request,
+      secret: config.nextAuthSecret,
+    });
 
   if (!token?.accessToken) {
     throw new UnauthorizedError('Valid authentication required');

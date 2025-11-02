@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+// Note: next.config.ts runs at build time, so we need to access env vars directly
+// The config service is validated at runtime, so we use process.env here with defaults
+const nextAuthUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+
 const nextConfig: NextConfig = {
   /* Compiler options */
   reactStrictMode: true,
@@ -78,7 +82,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+            value: nextAuthUrl,
           },
           {
             key: 'Access-Control-Allow-Methods',

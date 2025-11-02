@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { AppError } from '@/lib/errors/app-error';
 import { logger } from '@/lib/logger';
 import { getOrCreateRequestId, REQUEST_ID_HEADER } from '@/lib/logger/request-id';
+import { isProduction } from '@/lib/config';
 
 /**
  * Global error handler middleware
@@ -126,7 +127,6 @@ export function errorHandler(
     });
 
     // In production, don't expose error details
-    const isProduction = process.env.NODE_ENV === 'production';
     const message = isProduction
       ? 'An unexpected error occurred'
       : error.message;

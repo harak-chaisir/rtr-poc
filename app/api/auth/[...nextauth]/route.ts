@@ -1,5 +1,6 @@
 import NextAuth, { AuthOptions } from 'next-auth';
 import { SESSION_MAX_AGE, fastTrakProvider, jwtCallback, sessionCallback } from '@/lib/auth';
+import { config } from '@/lib/config';
 
 /**
  * NextAuth configuration
@@ -24,7 +25,7 @@ export const authOptions: AuthOptions = {
         jwt: jwtCallback,
         session: sessionCallback,
     },
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: config.nextAuthSecret,
 };
 
 const handler = NextAuth(authOptions);

@@ -6,8 +6,10 @@ import path from 'path';
  * error: 0, warn: 1, info: 2, http: 3, verbose: 4, debug: 5, silly: 6
  */
 
-const logLevel = process.env.LOG_LEVEL || 'info';
-const nodeEnv = process.env.NODE_ENV || 'development';
+import { config } from '@/lib/config';
+
+const logLevel = config.logLevel;
+const nodeEnv = config.nodeEnv;
 
 // Define log format
 const logFormat = winston.format.combine(

@@ -10,6 +10,7 @@ import type {
   UserListResponse,
 } from '@/types/user-registration';
 import { BadGatewayError, InternalServerError, NotFoundError, AppError } from '@/lib/errors';
+import { isDevelopment } from '@/lib/config';
 
 /**
  * User Registration Service
@@ -113,7 +114,7 @@ export async function updateUser(
     }
 
     // Log the update (we'll implement audit logging separately)
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment) {
       console.log(`[UserService] User ${userId} updated by ${updatedBy}`, updates);
     }
 

@@ -1,3 +1,5 @@
+import { config } from '@/lib/config';
+
 export type FastTrakAuthResp = {
     id: string;
     accessToken: string;
@@ -20,7 +22,7 @@ export type FastTrakRegisterResp = {
     message: string;
 }
 
-const FT_BASE = process.env.FASTTRAK_API || 'http://localhost:3001';
+const FT_BASE = config.fastTrakApi;
 
 /**
  * Authenticates a user with the FastTrak API

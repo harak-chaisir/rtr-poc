@@ -1,6 +1,7 @@
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { authenticateFastTrak } from '@/lib/fasttrak';
 import { upsertUser } from './user-service';
+import { isDevelopment } from '@/lib/config';
 
 /**
  * FastTrak credentials provider
@@ -47,7 +48,7 @@ export const fastTrakProvider = CredentialsProvider({
       };
     } catch (error) {
       // Log authentication errors in development
-      if (process.env.NODE_ENV === 'development') {
+      if (isDevelopment) {
         console.error('[NextAuth] Authentication failed:', error);
       }
       return null;

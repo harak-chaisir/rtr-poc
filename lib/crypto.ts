@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { config, validateEncryptionKey } from '@/lib/config';
 
 // Encryption constants
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
@@ -6,14 +7,11 @@ const IV_LENGTH = 12; // 96 bits for GCM mode
 const AUTH_TAG_LENGTH = 16; // 128 bits
 const KEY_LENGTH = 32; // 256 bits
 
-const KEY_BASE64 = process.env.TOKEN_ENCRYPTION_KEY!;
-if (!KEY_BASE64) {
-    throw new Error('Please define the TOKEN_ENCRYPTION_KEY environment variable inside .env.local');
-}
-const KEY = Buffer.from(KEY_BASE64, 'base64');
-if (KEY.length !== KEY_LENGTH) {
-    throw new Error(`TOKEN_ENCRYPTION_KEY must be ${KEY_LENGTH} bytes when decoded from base64`);
-}
+// Validate encryption key on module load
+validateEncryptionKey();
+
+// Get encryption key from config
+const KEY = Buffer.from(config.tokenEncryptionKey, 'base64');
 
 /**
  * Encrypts text using AES-256-GCM

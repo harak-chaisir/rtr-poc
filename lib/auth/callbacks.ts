@@ -7,6 +7,7 @@ import {
   refreshAccessToken,
   decryptAccessToken 
 } from './token-service';
+import { isDevelopment } from '@/lib/config';
 
 /**
  * NextAuth callbacks
@@ -74,7 +75,7 @@ export async function jwtCallback({
     return token;
   } catch (error) {
     // Log error for debugging (in production, use proper logging service)
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment) {
       console.error('[NextAuth] Token refresh failed:', error);
     }
 
@@ -113,7 +114,7 @@ export async function sessionCallback({
     try {
       session.accessToken = decryptAccessToken(token.accessToken);
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
+      if (isDevelopment) {
         console.error('[NextAuth] Failed to decrypt access token:', error);
       }
       session.error = 'TokenDecryptionError';
